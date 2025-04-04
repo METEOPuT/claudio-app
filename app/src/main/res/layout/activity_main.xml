@@ -7,34 +7,100 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <TextView
-        android:id="@+id/connectionStatus"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Status: Disconnected"
-        android:textSize="18sp"
-        android:layout_marginTop="100dp"
-        android:layout_gravity="center"
-
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:gravity="center"
         android:orientation="vertical"
-        tools:layout_editor_absoluteX="0dp"
-        tools:layout_editor_absoluteY="67dp">
+        android:gravity="center">
 
-        <Button
-            android:id="@+id/startCallButton"
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+
+            <Button
+                android:id="@+id/startCallButton"
+                android:layout_width="125dp"
+                android:layout_height="125dp"
+                android:text="Установить соединение"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/stopCallButton"
+                android:layout_width="125dp"
+                android:layout_height="125dp"
+                android:text="Разорвать соединение"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/AudioOutputButton"
+                android:layout_width="125dp"
+                android:layout_height="125dp"
+                android:text="Аудиовыход ON/OFF"
+                android:textSize="11sp" />
+
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/connectionStatus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Start Audio Call" />
+            android:text="Status: Disconnected"
+            android:textSize="20sp"
+            android:layout_marginTop="-200dp"
+            android:layout_gravity="center"
+
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <EditText
+            android:id="@+id/FIO"
+            android:layout_width="375dp"
+            android:layout_height="50dp"
+            android:background="@color/white"
+            android:backgroundTint="@android:color/transparent"
+            android:elevation="4dp"
+            android:gravity="center"
+            android:hint="ФИО"
+            android:inputType="textPersonName"
+            android:outlineSpotShadowColor="@color/black"
+            android:textSize="18sp" />
+
+        <EditText
+            android:id="@+id/workplaceNumberInput"
+            android:layout_width="375dp"
+            android:layout_height="50dp"
+            android:background="@color/white"
+            android:backgroundTint="@android:color/transparent"
+            android:elevation="4dp"
+            android:gravity="center"
+            android:hint="Номер рабочего места"
+            android:inputType="number"
+            android:outlineSpotShadowColor="@color/black"
+            android:textSize="18sp" />
+
+        <EditText
+            android:id="@+id/ServerNumberInput"
+            android:layout_width="375dp"
+            android:layout_height="50dp"
+            android:background="@color/white"
+            android:backgroundTint="@android:color/transparent"
+            android:elevation="4dp"
+            android:gravity="center"
+            android:hint="Номер канала связи с сервером"
+            android:inputType="number"
+            android:outlineSpotShadowColor="@color/black"
+            android:textSize="18sp" />
+
     </LinearLayout>
+
+
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>
