@@ -26,22 +26,24 @@
                 android:layout_width="125dp"
                 android:layout_height="125dp"
                 android:text="Установить соединение"
-                android:textSize="11sp" />
+                android:textSize="11sp"
+                android:background="@drawable/rounded_button"/>
 
             <Button
                 android:id="@+id/stopCallButton"
                 android:layout_width="125dp"
                 android:layout_height="125dp"
                 android:text="Разорвать соединение"
-                android:textSize="11sp" />
+                android:textSize="11sp"
+                android:background="@drawable/rounded_button"/>
 
-            <Button
+            <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/AudioOutputButton"
                 android:layout_width="125dp"
                 android:layout_height="125dp"
                 android:text="Аудиовыход ON/OFF"
-                android:textSize="11sp" />
-
+                android:textSize="11sp"
+                android:background="@drawable/rounded_button"/>
 
         </LinearLayout>
 

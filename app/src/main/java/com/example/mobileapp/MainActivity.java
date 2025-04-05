@@ -21,17 +21,19 @@ import org.json.JSONObject;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.TextView;
+import android.graphics.Color;
+import android.content.res.ColorStateList;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "WebRTC_Audio";
-
     private PeerConnectionFactory peerConnectionFactory;
     private PeerConnection peerConnection;
     private AudioTrack remoteAudioTrack;
     private Socket mSocket;
     private TextView connectionStatus; // TextView для отображения состояния подключения
     private Handler mainHandler;
+    private boolean isAudioEnabled = true; // Флаг состояния аудиовыхода
 
 
 
@@ -45,6 +47,10 @@ public class MainActivity extends AppCompatActivity {
         // Кнопка для запуска WebRTC
         Button startCallButton = findViewById(R.id.startCallButton);
         startCallButton.setOnClickListener(v -> initializeWebRTC());
+
+        //Кнопка аудиовыхода
+        Button audioOutputButton = findViewById(R.id.AudioOutputButton);
+        audioOutputButton.setOnClickListener(v -> toggleAudioOutput());
 
         connectionStatus = findViewById(R.id.connectionStatus);
         mainHandler = new Handler(Looper.getMainLooper());
@@ -72,7 +78,7 @@ public class MainActivity extends AppCompatActivity {
 
             mSocket.on(Socket.EVENT_CONNECT_ERROR, args -> {
                 runOnUiThread(() -> {
-                    connectionStatus.setText("Connection Error");
+                        connectionStatus.setText("Connection Error");
                     Log.e("Socket.IO", "Connection error", (Throwable) args[0]);
                 });
             });
@@ -87,6 +93,23 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception e) {
             Log.e("Socket.IO", "Connection error", e);
             updateConnectionStatus("Error: " + e.getMessage());
+        }
+    }
+
+    private void toggleAudioOutput() {
+        Button audioOutputButton = findViewById(R.id.AudioOutputButton);
+
+        if (remoteAudioTrack != null) {
+            // Переключаем состояние аудиовыхода
+            isAudioEnabled = !isAudioEnabled;
+            remoteAudioTrack.setEnabled(isAudioEnabled);
+
+            // Изменяем фон кнопки в зависимости от состояния
+            int color = isAudioEnabled ? R.color.green : R.color.red; // зелёный или красный
+            audioOutputButton.setBackgroundColor(getResources().getColor(color));
+
+            // Логируем состояние
+            Log.d("WebRTC_Audio", "Audio output: " + (isAudioEnabled ? "ON" : "OFF"));
         }
     }
 
