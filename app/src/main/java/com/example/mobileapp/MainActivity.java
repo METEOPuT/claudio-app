@@ -21,8 +21,7 @@ import org.json.JSONObject;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.TextView;
-import android.graphics.Color;
-import android.content.res.ColorStateList;
+import androidx.core.content.ContextCompat;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -46,7 +45,9 @@ public class MainActivity extends AppCompatActivity {
 
         // Кнопка для запуска WebRTC
         Button startCallButton = findViewById(R.id.startCallButton);
-        startCallButton.setOnClickListener(v -> initializeWebRTC());
+        startCallButton.setOnClickListener(v -> {
+            connectToServer();      // Сначала подключаемся к Socket.IO
+        });
 
         //Кнопка аудиовыхода
         Button audioOutputButton = findViewById(R.id.AudioOutputButton);
@@ -55,17 +56,26 @@ public class MainActivity extends AppCompatActivity {
         connectionStatus = findViewById(R.id.connectionStatus);
         mainHandler = new Handler(Looper.getMainLooper());
 
-        // Код для подключения к серверу через Socket.IO
+        Button stopCallButton = findViewById(R.id.stopCallButton);
+        stopCallButton.setOnClickListener(v -> {
+            if (peerConnection != null) {
+                peerConnection.close();
+                peerConnection = null;
+                Log.d(TAG, "PeerConnection closed.");
+                connectionStatus.setText("Call Stopped");
+            }
+        });
+    }
+    private void connectToServer() {
         try {
-            // Укажите IP-адрес и порт вашего сервера Node.js
             mSocket = IO.socket("http://192.168.0.118:8080");
             mSocket.connect();
 
-            // Логируем успешное подключение
             mSocket.on(Socket.EVENT_CONNECT, args -> {
                 runOnUiThread(() -> {
                     connectionStatus.setText("Connected");
                     Log.d("Socket.IO", "Connected to server!");
+                    initializeWebRTC(); // Запускаем WebRTC только после соединения
                 });
             });
 
@@ -78,16 +88,20 @@ public class MainActivity extends AppCompatActivity {
 
             mSocket.on(Socket.EVENT_CONNECT_ERROR, args -> {
                 runOnUiThread(() -> {
-                        connectionStatus.setText("Connection Error");
+                    connectionStatus.setText("Connection Error");
                     Log.e("Socket.IO", "Connection error", (Throwable) args[0]);
                 });
             });
-            ;
 
-
-            // Добавляем обработчик для кастомного события
-            mSocket.on("some_event", args -> {
-                Log.d("Socket.IO", "Event received: " + args[0]);
+            mSocket.on("signal", args -> {
+                JSONObject data = (JSONObject) args[0];
+                try {
+                    String type = data.getString("type");
+                    String message = data.getString("data");
+                    handleIncomingSignal(type, message);
+                } catch (JSONException e) {
+                    Log.e(TAG, "Signal error", e);
+                }
             });
 
         } catch (Exception e) {
@@ -95,7 +109,26 @@ public class MainActivity extends AppCompatActivity {
             updateConnectionStatus("Error: " + e.getMessage());
         }
     }
+    private void stopCall() {
+        if (peerConnection != null) {
+            peerConnection.close();
+            peerConnection = null;
+        }
 
+        if (remoteAudioTrack != null) {
+            remoteAudioTrack.setEnabled(false);
+            remoteAudioTrack = null;
+        }
+
+        if (mSocket != null && mSocket.connected()) {
+            mSocket.emit("manual_disconnect"); // Сначала сообщаем серверу
+            mSocket.disconnect();              // Затем отключаемся
+            mSocket.close();                   // Закрываем
+            mSocket = null;
+        }
+
+        Log.d(TAG, "Call stopped, peerConnection and socket closed.");
+    }
     private void toggleAudioOutput() {
         Button audioOutputButton = findViewById(R.id.AudioOutputButton);
 
@@ -106,7 +139,7 @@ public class MainActivity extends AppCompatActivity {
 
             // Изменяем фон кнопки в зависимости от состояния
             int color = isAudioEnabled ? R.color.green : R.color.red; // зелёный или красный
-            audioOutputButton.setBackgroundColor(getResources().getColor(color));
+            audioOutputButton.setBackgroundColor(ContextCompat.getColor(this, color));
 
             // Логируем состояние
             Log.d("WebRTC_Audio", "Audio output: " + (isAudioEnabled ? "ON" : "OFF"));
