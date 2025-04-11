@@ -12,6 +12,7 @@ import org.webrtc.PeerConnection;
 import org.webrtc.PeerConnectionFactory;
 import org.webrtc.SessionDescription;
 import org.webrtc.SdpObserver;
+import org.webrtc.DataChannel;
 import java.util.ArrayList;
 import java.util.List;
 import io.socket.client.IO;
@@ -21,20 +22,28 @@ import org.json.JSONObject;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.TextView;
-import androidx.core.content.ContextCompat;
+import android.app.PendingIntent;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.nfc.NfcAdapter;
+import android.nfc.Tag;
+import android.nfc.tech.NfcA;
+import java.nio.ByteBuffer;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "WebRTC_Audio";
-    private PeerConnectionFactory peerConnectionFactory;
-    private PeerConnection peerConnection;
-    private AudioTrack remoteAudioTrack;
-    private Socket mSocket;
+    private PeerConnectionFactory peerConnectionFactory; //фабрика для создания объектов WebRTC
+    private PeerConnection peerConnection; //соединение между двумя участниками
+    private AudioTrack remoteAudioTrack; //аудиотрек, получаемый от удаленного участника
+    private Socket mSocket; //клиент Socket.IO для связи с сервером
     private TextView connectionStatus; // TextView для отображения состояния подключения
-    private Handler mainHandler;
+    private TextView uid; // TextView для отображения UID пропуска
+    private Handler mainHandler; //нужен для обновлений UI из других потоков
     private boolean isAudioEnabled = true; // Флаг состояния аудиовыхода
-
-
+    private NfcAdapter nfcAdapter;
+    private AudioTrack localAudioTrack;
+    private DataChannel dataChannel;
 
 
     @Override
@@ -42,6 +51,17 @@ public class MainActivity extends AppCompatActivity {
 
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        nfcAdapter = NfcAdapter.getDefaultAdapter(this);
+
+        if (nfcAdapter == null) {
+            Log.e("NFC", "NFC не поддерживается на этом устройстве.");
+            return;
+        }
+
+        if (!nfcAdapter.isEnabled()) {
+            Log.e("NFC", "NFC выключен. Пожалуйста, включите NFC в настройках.");
+        }
 
         // Кнопка для запуска WebRTC
         Button startCallButton = findViewById(R.id.startCallButton);
@@ -54,8 +74,10 @@ public class MainActivity extends AppCompatActivity {
         audioOutputButton.setOnClickListener(v -> toggleAudioOutput());
 
         connectionStatus = findViewById(R.id.connectionStatus);
+        uid = findViewById(R.id.uid);
         mainHandler = new Handler(Looper.getMainLooper());
 
+        //Кнопка разрыва соединения
         Button stopCallButton = findViewById(R.id.stopCallButton);
         stopCallButton.setOnClickListener(v -> {
             if (peerConnection != null) {
@@ -66,6 +88,87 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (nfcAdapter != null) {
+            // Указываем флаг FLAG_IMMUTABLE
+            PendingIntent pendingIntent = PendingIntent.getActivity(
+                    this,
+                    0,
+                    new Intent(this, getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                    PendingIntent.FLAG_IMMUTABLE // Используем флаг для неизменяемости
+            );
+            nfcAdapter.enableForegroundDispatch(this, pendingIntent, new IntentFilter[]{new IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED)}, null);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (nfcAdapter != null) {
+            nfcAdapter.disableForegroundDispatch(this);
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        Log.d("NFC", "onNewIntent triggered");
+        if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(intent.getAction())) {
+            Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+            NfcA nfcA = NfcA.get(tag);
+            if (nfcA.isConnected()) {
+                Log.d("NFC", "Successfully connected to tag");
+            } else {
+                Log.e("NFC", "Failed to connect to tag");
+            }
+            try {
+                nfcA.connect();
+                byte[] id = nfcA.getTag().getId(); // Получаем уникальный ID карты
+                Log.d("NFC", "Tag detected: " + tag);
+                String cardNumber = bytesToHex(id); // Преобразуем байты в строку
+                Log.d("NFC", "Card ID: " + cardNumber);
+
+                updateUID(cardNumber);
+
+                // После того как считан ID карты, можно передать его через WebRTC
+                sendCardNumberThroughWebRTC(cardNumber);
+
+                nfcA.close();
+            } catch (Exception e) {
+                Log.e("NFC", "Ошибка чтения NFC", e);
+            }
+        }
+    }
+
+    private String bytesToHex(byte[] bytes) {
+        StringBuilder stringBuilder = new StringBuilder();
+        for (byte b : bytes) {
+            stringBuilder.append(String.format("%02X", b));
+        }
+        return stringBuilder.toString();
+    }
+
+    private void sendCardNumberThroughWebRTC(String cardNumber) {
+        if (dataChannel != null) {
+            // Преобразуем строку в массив байт
+            byte[] cardNumberBytes = cardNumber.getBytes();
+
+            // Создаем ByteBuffer из массива байт
+            ByteBuffer byteBuffer = ByteBuffer.wrap(cardNumberBytes);
+
+            // Создаем DataChannel.Buffer с ByteBuffer
+            DataChannel.Buffer buffer = new DataChannel.Buffer(byteBuffer, false);
+
+            // Отправляем данные через DataChannel
+            dataChannel.send(buffer);
+            Log.d("WebRTC", "Card number sent: " + cardNumber);
+        }
+    }
+
+    //Подключение к серверу через Socket.IO
     private void connectToServer() {
         try {
             mSocket = IO.socket("http://192.168.0.118:8080");
@@ -109,6 +212,7 @@ public class MainActivity extends AppCompatActivity {
             updateConnectionStatus("Error: " + e.getMessage());
         }
     }
+    //Завершает соединение с сервером и отключает аудиовыход
     private void stopCall() {
         if (peerConnection != null) {
             peerConnection.close();
@@ -129,21 +233,24 @@ public class MainActivity extends AppCompatActivity {
 
         Log.d(TAG, "Call stopped, peerConnection and socket closed.");
     }
+    //Меняет состояние включения аудиотрека
     private void toggleAudioOutput() {
         Button audioOutputButton = findViewById(R.id.AudioOutputButton);
 
+        isAudioEnabled = !isAudioEnabled;
+
+        // Если уже есть треки — применяем к ним
         if (remoteAudioTrack != null) {
-            // Переключаем состояние аудиовыхода
-            isAudioEnabled = !isAudioEnabled;
             remoteAudioTrack.setEnabled(isAudioEnabled);
-
-            // Изменяем фон кнопки в зависимости от состояния
-            int color = isAudioEnabled ? R.color.green : R.color.red; // зелёный или красный
-            audioOutputButton.setBackgroundColor(ContextCompat.getColor(this, color));
-
-            // Логируем состояние
-            Log.d("WebRTC_Audio", "Audio output: " + (isAudioEnabled ? "ON" : "OFF"));
         }
+        if (localAudioTrack != null) {
+            localAudioTrack.setEnabled(isAudioEnabled);
+        }
+
+        int backgroundRes = isAudioEnabled ? R.drawable.rounded_button_green : R.drawable.rounded_button_red;
+        audioOutputButton.setBackgroundResource(backgroundRes);
+
+        Log.d("WebRTC_Audio", "Audio output: " + (isAudioEnabled ? "ON" : "OFF"));
     }
 
     private void handleIncomingSignal(String type, String data) {
@@ -188,11 +295,24 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
+    //Обновление текстового поля о состоянии соединения
     private void updateConnectionStatus(String status) {
         mainHandler.post(() -> connectionStatus.setText("Status: " + status));
     }
 
+    //Обновление текстового поля о UID пропуска
+    private void updateUID(String cardNumber) {
+        Log.d("NFC", "Updating UID: " + cardNumber);
+        mainHandler.post(() -> {
+            if (uid != null) {
+                uid.setText("UID: " + cardNumber);
+                Log.d("NFC", "UID updated on UI");
+            } else {
+                Log.e("NFC", "UID TextView is null");
+            }
+        });
+    }
+    //Отправка сигнального сообщения на сервер через Socket.IO
     private void sendSignalToServer(String type, String data) {
         try {
             JSONObject message = new JSONObject();
@@ -205,7 +325,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void initializeWebRTC() {
-        // Шаг 1: Инициализация PeerConnectionFactoryd
+        // Шаг 1: Инициализация PeerConnectionFactory
 
         PeerConnectionFactory.InitializationOptions initializationOptions =
                 PeerConnectionFactory.InitializationOptions.builder(this)
@@ -221,21 +341,19 @@ public class MainActivity extends AppCompatActivity {
         // Шаг 2: Создание MediaStream и AudioTrack
         MediaConstraints audioConstraints = new MediaConstraints();
         AudioSource audioSource = peerConnectionFactory.createAudioSource(audioConstraints);
-        AudioTrack localAudioTrack = peerConnectionFactory.createAudioTrack("LOCAL_AUDIO", audioSource);
+        localAudioTrack = peerConnectionFactory.createAudioTrack("LOCAL_AUDIO", audioSource);
 
         // Шаг 3: Настройка PeerConnection
         List<PeerConnection.IceServer> iceServers = new ArrayList<>();
         PeerConnection.IceServer iceServer = PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer();
         iceServers.add(iceServer);
 
-        peerConnection = peerConnectionFactory.createPeerConnection(iceServers, new PeerConnection.Observer() {
+        PeerConnection.RTCConfiguration rtcConfig = new PeerConnection.RTCConfiguration(iceServers);
+        peerConnection = peerConnectionFactory.createPeerConnection(rtcConfig, new PeerConnection.Observer() {
             @Override
             public void onSignalingChange(PeerConnection.SignalingState signalingState) {
                 Log.d(TAG, "Signaling state: " + signalingState);
             }
-
-
-
 
             @Override
             public void onIceConnectionChange(PeerConnection.IceConnectionState iceConnectionState) {
@@ -243,12 +361,10 @@ public class MainActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onIceConnectionReceivingChange(boolean b) {
-            }
+            public void onIceConnectionReceivingChange(boolean b) { }
 
             @Override
-            public void onIceGatheringChange(PeerConnection.IceGatheringState iceGatheringState) {
-            }
+            public void onIceGatheringChange(PeerConnection.IceGatheringState iceGatheringState) { }
 
             @Override
             public void onIceCandidate(org.webrtc.IceCandidate iceCandidate) {
@@ -257,8 +373,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onIceCandidatesRemoved(org.webrtc.IceCandidate[] iceCandidates) {
-            }
+            public void onIceCandidatesRemoved(org.webrtc.IceCandidate[] iceCandidates) { }
 
             @Override
             public void onAddStream(MediaStream mediaStream) {
@@ -271,18 +386,17 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onRemoveStream(MediaStream mediaStream) {
+                Log.d(TAG, "Stream removed: " + mediaStream);
             }
 
             @Override
-            public void onDataChannel(org.webrtc.DataChannel dataChannel) {
-            }
+            public void onRenegotiationNeeded() { }
 
             @Override
-            public void onRenegotiationNeeded() {
-            }
-
-            @Override
-            public void onAddTrack(org.webrtc.RtpReceiver rtpReceiver, MediaStream[] mediaStreams) {
+            public void onDataChannel(DataChannel dataChannel) {
+                Log.d(TAG, "DataChannel created: " + dataChannel);
+                // Сохраняем ссылку на dataChannel
+                MainActivity.this.dataChannel = dataChannel;
             }
         });
 
@@ -310,3 +424,4 @@ public class MainActivity extends AppCompatActivity {
         }, new MediaConstraints());
     }
 }
+

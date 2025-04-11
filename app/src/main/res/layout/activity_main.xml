@@ -43,7 +43,7 @@
                 android:layout_height="125dp"
                 android:text="Аудиовыход ON/OFF"
                 android:textSize="11sp"
-                android:background="@drawable/rounded_button"/>
+                android:background="@drawable/rounded_button_selector"/>
 
         </LinearLayout>
 
@@ -54,6 +54,19 @@
             android:text="Status: Disconnected"
             android:textSize="20sp"
             android:layout_marginTop="-200dp"
+            android:layout_gravity="center"
+
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/uid"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="UID:"
+            android:textSize="20sp"
             android:layout_gravity="center"
 
             app:layout_constraintBottom_toBottomOf="parent"
