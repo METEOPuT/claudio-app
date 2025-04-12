@@ -124,7 +124,6 @@ public class MainActivity extends AppCompatActivity {
         if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(intent.getAction()) ||
                 NfcAdapter.ACTION_NDEF_DISCOVERED.equals(intent.getAction()) ||
                 NfcAdapter.ACTION_TECH_DISCOVERED.equals(intent.getAction())) {
-            Log.d("NFC", "Условие выполнилось");
             Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
             if (tag != null) {
                 NfcA nfcA = NfcA.get(tag);

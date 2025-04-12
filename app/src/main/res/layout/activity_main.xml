@@ -74,31 +74,18 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <EditText
-            android:id="@+id/FIO"
-            android:layout_width="375dp"
-            android:layout_height="50dp"
-            android:background="@color/white"
-            android:backgroundTint="@android:color/transparent"
-            android:elevation="4dp"
-            android:gravity="center"
-            android:hint="ФИО"
-            android:inputType="textPersonName"
-            android:outlineSpotShadowColor="@color/black"
-            android:textSize="18sp" />
+        <TextView
+            android:id="@+id/fio"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ФИО:"
+            android:textSize="20sp"
+            android:layout_gravity="center"
 
-        <EditText
-            android:id="@+id/workplaceNumberInput"
-            android:layout_width="375dp"
-            android:layout_height="50dp"
-            android:background="@color/white"
-            android:backgroundTint="@android:color/transparent"
-            android:elevation="4dp"
-            android:gravity="center"
-            android:hint="Номер рабочего места"
-            android:inputType="number"
-            android:outlineSpotShadowColor="@color/black"
-            android:textSize="18sp" />
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
         <EditText
             android:id="@+id/ServerNumberInput"
