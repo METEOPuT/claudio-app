@@ -93,14 +93,16 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         if (nfcAdapter != null) {
-            // Указываем флаг FLAG_IMMUTABLE
+            // Указываем флаг FLAG_IMMUTABLE для PendingIntent
             PendingIntent pendingIntent = PendingIntent.getActivity(
                     this,
                     0,
                     new Intent(this, getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-                    PendingIntent.FLAG_IMMUTABLE // Используем флаг для неизменяемости
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE // Для совместимости с Android 12+
             );
-            nfcAdapter.enableForegroundDispatch(this, pendingIntent, new IntentFilter[]{new IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED)}, null);
+
+            IntentFilter tagFilter = new IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED);
+            nfcAdapter.enableForegroundDispatch(this, pendingIntent, new IntentFilter[]{tagFilter}, null);
         }
     }
 
@@ -115,31 +117,43 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        Log.d("NFC", "onNewIntent triggered");
-        if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(intent.getAction())) {
+        Log.d("NFC", "Intent action: " + intent.getAction());
+        if (intent.getExtras() != null) {
+            Log.d("NFC", "Intent extras: " + intent.getExtras().toString());
+        }
+        if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(intent.getAction()) ||
+                NfcAdapter.ACTION_NDEF_DISCOVERED.equals(intent.getAction()) ||
+                NfcAdapter.ACTION_TECH_DISCOVERED.equals(intent.getAction())) {
+            Log.d("NFC", "Условие выполнилось");
             Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
-            NfcA nfcA = NfcA.get(tag);
-            if (nfcA.isConnected()) {
-                Log.d("NFC", "Successfully connected to tag");
+            if (tag != null) {
+                NfcA nfcA = NfcA.get(tag);
+                try {
+                    if (nfcA != null && nfcA.isConnected()) {
+                        Log.d("NFC", "Successfully connected to tag");
+                    } else {
+                        Log.e("NFC", "Failed to connect to tag");
+                    }
+
+                    nfcA.connect();
+                    byte[] id = nfcA.getTag().getId(); // Получаем уникальный ID карты
+                    String cardNumber = bytesToHex(id); // Преобразуем байты в строку
+
+                    Log.d("NFC", "Card ID: " + cardNumber);
+                    updateUID(cardNumber);
+
+                    // Отправка номера карты через WebRTC
+                    sendCardNumberThroughWebRTC(cardNumber);
+
+                    nfcA.close();
+                } catch (Exception e) {
+                    Log.e("NFC", "Ошибка чтения NFC", e);
+                }
             } else {
-                Log.e("NFC", "Failed to connect to tag");
+                Log.e("NFC", "Tag is null");
             }
-            try {
-                nfcA.connect();
-                byte[] id = nfcA.getTag().getId(); // Получаем уникальный ID карты
-                Log.d("NFC", "Tag detected: " + tag);
-                String cardNumber = bytesToHex(id); // Преобразуем байты в строку
-                Log.d("NFC", "Card ID: " + cardNumber);
-
-                updateUID(cardNumber);
-
-                // После того как считан ID карты, можно передать его через WebRTC
-                sendCardNumberThroughWebRTC(cardNumber);
-
-                nfcA.close();
-            } catch (Exception e) {
-                Log.e("NFC", "Ошибка чтения NFC", e);
-            }
+        } else {
+            Log.e("NFC", "Invalid intent action or intent is null");
         }
     }
 
