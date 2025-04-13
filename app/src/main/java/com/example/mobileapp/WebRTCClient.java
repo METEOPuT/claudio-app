@@ -26,7 +26,6 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
-import org.json.JSONObject;
 import java.io.IOException;
 import java.util.ArrayList;
 
@@ -37,7 +36,7 @@ public class WebRTCClient {
     private AudioTrack audioTrack;
     private MediaConstraints mediaConstraints;
     private Context context;
-
+    private MediaStream currentMediaStream;
     private PeerConnection.Observer peerConnectionObserver = new PeerConnectionObserver();
 
     public WebRTCClient(Context context) {
@@ -62,12 +61,12 @@ public class WebRTCClient {
     private void sendSdpToServer(SessionDescription offer, String serverUrl) {
         OkHttpClient client = new OkHttpClient();
 
-        String json = "{\"sdp\": \"" + offer.description.replace("\n", "\\n") + "\", \"type\": \"offer\"}";
-
-        RequestBody body = RequestBody.create(json, MediaType.get("application/json"));
+        RequestBody body = RequestBody.create(offer.description, MediaType.get("application/sdp"));
         Request request = new Request.Builder()
-                .url(serverUrl + "/offer")
+                .url(serverUrl + "/whep")  // укажи актуальный путь к ресурсу на WHEP-сервере
                 .post(body)
+                .addHeader("Content-Type", "application/sdp")
+                .addHeader("Accept", "application/sdp")
                 .build();
 
         client.newCall(request).enqueue(new Callback() {
@@ -84,10 +83,9 @@ public class WebRTCClient {
                 }
 
                 try {
-                    String responseJson = response.body().string();
-                    JSONObject jsonObject = new JSONObject(responseJson);
-                    String sdpAnswer = jsonObject.getString("sdp");
+                    String sdpAnswer = response.body().string();
                     SessionDescription answer = new SessionDescription(SessionDescription.Type.ANSWER, sdpAnswer.replace("\\n", "\n"));
+                    //Log.d(TAG, "Получен SDP-ответ: " + sdpAnswer);
 
                     peerConnection.setRemoteDescription(new SdpObserverImpl(), answer);
                 } catch (Exception e) {
@@ -140,13 +138,11 @@ public class WebRTCClient {
 
         if (peerConnection == null) {
             Log.e(TAG, "Не удалось создать PeerConnection! Возвращено null.");
-            Log.e(TAG, "Не удалось создать PeerConnection! rtcConfig: " + rtcConfig);
-            Log.e(TAG, "Не удалось создать PeerConnection! peerConnectionObserver: " + peerConnectionObserver);
             return;
         }
 
         // Создание MediaStream и добавление AudioTrack
-        MediaStream mediaStream = peerConnectionFactory.createLocalMediaStream("stream1");
+        currentMediaStream = peerConnectionFactory.createLocalMediaStream("stream1");
         AudioSource audioSource = peerConnectionFactory.createAudioSource(mediaConstraints);
         if (audioSource == null) {
             Log.e(TAG, "Ошибка создания AudioSource!");
@@ -160,10 +156,11 @@ public class WebRTCClient {
         }
 
         // Добавляем аудиотрек в поток
-        mediaStream.addTrack(audioTrack);
+        currentMediaStream.addTrack(audioTrack);
 
         Log.d(TAG, "WebRTC соединение создано.");
     }
+
     private class PeerConnectionObserver implements PeerConnection.Observer {
 
         @Override
@@ -195,6 +192,7 @@ public class WebRTCClient {
 
         @Override
         public void onAddStream(MediaStream mediaStream) {
+            Log.d(TAG, "New media stream added: " + mediaStream.toString());
             setRemoteStream(mediaStream);
         }
 
@@ -210,31 +208,36 @@ public class WebRTCClient {
         public void onRenegotiationNeeded() {
         }
     }
+
+
     private static class SdpObserverImpl implements SdpObserver {
         @Override
         public void onCreateSuccess(SessionDescription sessionDescription) {
             // Реализовать логику при успешном создании SDP
         }
+
         @Override
         public void onSetSuccess() {
             // Реализовать логику при успешной установке SDP
         }
+
         @Override
         public void onCreateFailure(String s) {
             Log.e(TAG, "SDP Create failed: " + s);
         }
+
         @Override
         public void onSetFailure(String s) {
             Log.e(TAG, "SDP Set failed: " + s);
         }
     }
+
     public void setRemoteStream(MediaStream remoteStream) {
-        if (remoteStream != null && remoteStream.audioTracks.size() > 0) {
-            audioTrack = remoteStream.audioTracks.get(0);
-            audioTrack.setEnabled(true); // Включаем аудио
-            Log.d(TAG, "Добавлен аудиопоток: " + audioTrack.id());
-        }
+        audioTrack = remoteStream.audioTracks.get(0);
+        audioTrack.setEnabled(true); // Включаем аудио
+        Log.d(TAG, "Добавлен аудиопоток: " + audioTrack.id());
     }
+
     public void closeConnection() {
         if (peerConnection != null) {
             peerConnection.close();
@@ -242,5 +245,11 @@ public class WebRTCClient {
             Log.d(TAG, "WebRTC соединение закрыто.");
         }
     }
-}
 
+    public MediaStream getMediaStream() {
+        if (peerConnection == null) {
+            return null;
+        }
+        return currentMediaStream;
+    }
+}

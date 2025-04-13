@@ -15,6 +15,9 @@ import android.content.IntentFilter;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.nfc.tech.NfcA;
+import android.media.AudioTrack;
+
+import org.webrtc.MediaStream;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -35,6 +38,8 @@ public class MainActivity extends AppCompatActivity {
     private OkHttpClient client;
     private String NumberDevice;
     private boolean InNumberDevice = false;
+    private AudioTrack audioTrack;
+    private MediaStream audioStream;
 
 
     @Override
@@ -44,6 +49,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         webRTCClient = new WebRTCClient(this);; // Инициализация WebRTC клиента
+        audioStream = webRTCClient.getMediaStream();
         mainHandler = new Handler(Looper.getMainLooper());
         connectionStatus = findViewById(R.id.connectionStatus);
 
@@ -302,11 +308,19 @@ public class MainActivity extends AppCompatActivity {
         if (isAudioEnabled) {
             // Включаем вывод в наушники или динамики (например, в наушники)
             audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
-            audioManager.setSpeakerphoneOn(false);  // Используем наушники
+            audioManager.setSpeakerphoneOn(false);  // Используем наушники, если они подключены
         } else {
             // Отключаем вывод звука
-            audioManager.setMode(AudioManager.MODE_NORMAL);  // Отправляем звук в телефон, но не воспроизводим
+            audioManager.setMode(AudioManager.MODE_NORMAL);  // Звук в телефон, не воспроизводим
             audioManager.setSpeakerphoneOn(false);  // Отключаем динамики
+        }
+
+        // Проверка состояния наушников
+        boolean isHeadphonesPlugged = audioManager.isWiredHeadsetOn() || audioManager.isBluetoothA2dpOn();
+        if (isHeadphonesPlugged) {
+            Log.d("WebRTC_Audio", "Наушники подключены");
+        } else {
+            Log.d("WebRTC_Audio", "Наушники не подключены, используем динамики");
         }
 
         int backgroundRes = isAudioEnabled ? R.drawable.rounded_button_green : R.drawable.rounded_button_red;
