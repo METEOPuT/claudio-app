@@ -13,6 +13,10 @@ import org.webrtc.PeerConnection;
 import org.webrtc.PeerConnectionFactory;
 import org.webrtc.SdpObserver;
 import org.webrtc.SessionDescription;
+import org.webrtc.audio.JavaAudioDeviceModule;
+import org.webrtc.DefaultVideoDecoderFactory;
+import org.webrtc.DefaultVideoEncoderFactory;
+import org.webrtc.EglBase;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -94,11 +98,29 @@ public class WebRTCClient {
     }
 
     private void initializePeerConnectionFactory() {
+        // 1. Инициализация WebRTC
         PeerConnectionFactory.InitializationOptions options = PeerConnectionFactory.InitializationOptions.builder(context)
-                .createInitializationOptions(); // Используем context, переданный в конструктор
+                .setEnableInternalTracer(true)
+                .createInitializationOptions();
         PeerConnectionFactory.initialize(options);
 
-        peerConnectionFactory = PeerConnectionFactory.builder().createPeerConnectionFactory();
+        // 2. Создание модуля аудиоустройств
+        JavaAudioDeviceModule audioDeviceModule = JavaAudioDeviceModule.builder(context).createAudioDeviceModule();
+
+        // 3. Создание фабрики
+        PeerConnectionFactory.Options factoryOptions = new PeerConnectionFactory.Options();
+        peerConnectionFactory = PeerConnectionFactory.builder()
+                .setOptions(factoryOptions)
+                .setAudioDeviceModule(audioDeviceModule)
+                .setVideoDecoderFactory(new DefaultVideoDecoderFactory(EglBase.create().getEglBaseContext()))
+                .setVideoEncoderFactory(new DefaultVideoEncoderFactory(EglBase.create().getEglBaseContext(), true, true))
+                .createPeerConnectionFactory();
+
+        if (peerConnectionFactory == null) {
+            Log.e(TAG, "Ошибка создания PeerConnectionFactory!");
+        } else {
+            Log.d(TAG, "PeerConnectionFactory успешно инициализирована.");
+        }
     }
 
     public void createPeerConnection(String serverIpAddress) {
@@ -107,22 +129,37 @@ public class WebRTCClient {
         mediaConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"));
         mediaConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveVideo", "false"));
 
-        // Создаем список ICE серверов
-        ArrayList<PeerConnection.IceServer> iceServers = new ArrayList<>();
-
-        // Добавляем сервер STUN с IP-адресом вашего сервера
-        iceServers.add(new PeerConnection.IceServer("stun:" + serverIpAddress + ":3478"));
+        ArrayList<PeerConnection.IceServer> iceServers = new ArrayList<>(); //Пустой список ICE серверов
 
         // Создаем RTCConfig с этим сервером
         PeerConnection.RTCConfiguration rtcConfig = new PeerConnection.RTCConfiguration(iceServers);
+        rtcConfig.sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN;
 
         // Создаем PeerConnection
-        peerConnection = peerConnectionFactory.createPeerConnection(rtcConfig, mediaConstraints, peerConnectionObserver);
+        peerConnection = peerConnectionFactory.createPeerConnection(rtcConfig, peerConnectionObserver);
+
+        if (peerConnection == null) {
+            Log.e(TAG, "Не удалось создать PeerConnection! Возвращено null.");
+            Log.e(TAG, "Не удалось создать PeerConnection! rtcConfig: " + rtcConfig);
+            Log.e(TAG, "Не удалось создать PeerConnection! peerConnectionObserver: " + peerConnectionObserver);
+            return;
+        }
 
         // Создание MediaStream и добавление AudioTrack
         MediaStream mediaStream = peerConnectionFactory.createLocalMediaStream("stream1");
         AudioSource audioSource = peerConnectionFactory.createAudioSource(mediaConstraints);
+        if (audioSource == null) {
+            Log.e(TAG, "Ошибка создания AudioSource!");
+            return;
+        }
+
         audioTrack = peerConnectionFactory.createAudioTrack("audio", audioSource);
+        if (audioTrack == null) {
+            Log.e(TAG, "Ошибка создания AudioTrack!");
+            return;
+        }
+
+        // Добавляем аудиотрек в поток
         mediaStream.addTrack(audioTrack);
 
         Log.d(TAG, "WebRTC соединение создано.");

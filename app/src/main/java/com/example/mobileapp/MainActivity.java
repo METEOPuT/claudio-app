@@ -84,11 +84,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startWebRTC() {
-        // Настройка WebRTC
-        webRTCClient.startConnectionViaHttp("192.168.0.36:8889");
-        connectionStatus.setText("WebRTC Connected");
-        isWebRTCConnected = true;
-        Log.d(TAG, "WebRTC соединение установлено.");
+        try {
+            // Настройка WebRTC
+            webRTCClient.startConnectionViaHttp("http://192.168.0.36:8889/stream");
+            connectionStatus.setText("WebRTC Connected");
+            isWebRTCConnected = true;
+            Log.d(TAG, "WebRTC соединение установлено.");
+        } catch (Exception e) {
+            Log.e(TAG, "Ошибка при подключении к WebRTC серверу", e);
+            connectionStatus.setText("WebRTC Connection Error");
+        }
     }
 
     @Override
