@@ -238,6 +238,13 @@ public class WebRTCClient {
         Log.d(TAG, "Добавлен аудиопоток: " + audioTrack.id());
     }
 
+    public void setAudioEnabled(boolean enabled) {
+        if (audioTrack != null) {
+            audioTrack.setEnabled(enabled);
+            Log.d("WebRTC_Audio", "Аудио " + (enabled ? "включено" : "выключено"));
+        }
+    }
+
     public void closeConnection() {
         if (peerConnection != null) {
             peerConnection.close();

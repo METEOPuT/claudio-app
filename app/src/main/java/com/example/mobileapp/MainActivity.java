@@ -241,24 +241,28 @@ public class MainActivity extends AppCompatActivity {
             isAudioEnabled = true;
             runOnUiThread(() -> {
                 enableAudioOutput(true, true);
+                webRTCClient.setAudioEnabled(true);
             });
         }
         if (NumberDevice != null && text.equals(NumberDevice)) { //Если обратились ко мне
             isAudioEnabled = true;
             runOnUiThread(() -> {
                 enableAudioOutput(false, true);
+                webRTCClient.setAudioEnabled(true);
             });
         }
         if (NumberDevice != null && !text.equals(NumberDevice) && !text.equals("-1") && !text.equals("0")) { //Если обратились к другому
             isAudioEnabled = false;
             runOnUiThread(() -> {
                 enableAudioOutput(true, false);
+                webRTCClient.setAudioEnabled(false);
             });
         }
         if (NumberDevice != null && text.equals("-1")) { //Если замутили всех
             isAudioEnabled = false;
             runOnUiThread(() -> {
                 enableAudioOutput(false, false);
+                webRTCClient.setAudioEnabled(false);
             });
         }
     }
@@ -266,14 +270,23 @@ public class MainActivity extends AppCompatActivity {
     private void enableAudioOutput(boolean enable, boolean enable1) {
         Button audioOutputButton = findViewById(R.id.AudioOutputButton);
         runOnUiThread(() -> {
-            // Всё, что меняет UI — кнопки, тексты, анимации и т.д.
             audioOutputButton.setEnabled(enable);
 
             // Обновляем визуальное состояние кнопки
             if (!enable1) {
-                audioOutputButton.setBackgroundResource(R.drawable.rounded_button_red);  // Блокируем
+                audioOutputButton.setBackgroundResource(R.drawable.rounded_button_red);
             } else {
-                audioOutputButton.setBackgroundResource(R.drawable.rounded_button_green);  // Разблокируем
+                audioOutputButton.setBackgroundResource(R.drawable.rounded_button_green);
+            }
+
+            // Управление звуком устройства
+            AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            if (audioManager != null) {
+                audioManager.adjustStreamVolume(
+                        AudioManager.STREAM_MUSIC,
+                        enable1 ? AudioManager.ADJUST_UNMUTE : AudioManager.ADJUST_MUTE,
+                        0
+                );
             }
 
             Log.d("WebRTC_Audio", "Audio output: " + (enable ? "Enabled" : "Disabled"));
@@ -304,7 +317,6 @@ public class MainActivity extends AppCompatActivity {
         isAudioEnabled = !isAudioEnabled;
 
         AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-
         if (isAudioEnabled) {
             // Включаем вывод в наушники или динамики (например, в наушники)
             audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
@@ -313,6 +325,11 @@ public class MainActivity extends AppCompatActivity {
             // Отключаем вывод звука
             audioManager.setMode(AudioManager.MODE_NORMAL);  // Звук в телефон, не воспроизводим
             audioManager.setSpeakerphoneOn(false);  // Отключаем динамики
+        }
+
+        if (webRTCClient != null) {
+            webRTCClient.setAudioEnabled(isAudioEnabled);
+            Log.d("WebRTC_Audio", "WebRTC audio " + (isAudioEnabled ? "enabled" : "disabled"));
         }
 
         // Проверка состояния наушников
