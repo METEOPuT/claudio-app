@@ -62,8 +62,8 @@ public class MainActivity extends AppCompatActivity {
 
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        commandOverlay = findViewById(R.id.commandOverlay);
-        commandOverlay.setVisibility(View.VISIBLE);
+        //commandOverlay = findViewById(R.id.commandOverlay);
+        //commandOverlay.setVisibility(View.VISIBLE);
 
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
 
@@ -197,9 +197,9 @@ public class MainActivity extends AppCompatActivity {
             public void onMessage(WebSocket webSocket, String text) {
                 Log.d("WebSocket", "Получено: " + text);
 
-                runOnUiThread(() -> {
+                /*runOnUiThread(() -> {
                     showCommandOverlay("Команда: " + text);
-                });
+                });*/
 
                 if ((NumberDevice != null) && (InNumberDevice == false)) {
                     AudioMute(text);
@@ -369,7 +369,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void showCommandOverlay(String message) {
+    /*private void showCommandOverlay(String message) {
         if (commandOverlay == null) return;
 
         commandOverlay.setText(message);
@@ -379,7 +379,7 @@ public class MainActivity extends AppCompatActivity {
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             commandOverlay.setVisibility(View.GONE);
         }, 5000);
-    }
+    }*/
 
     private void initializeWebRTC() {
         // Шаг 1: Инициализация PeerConnectionFactory
