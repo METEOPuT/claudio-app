@@ -4,18 +4,8 @@ import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
 import android.util.Log;
 import android.widget.Button;
-import org.webrtc.AudioSource;
-import org.webrtc.AudioTrack;
-import org.webrtc.MediaConstraints;
-import org.webrtc.MediaStream;
-import org.webrtc.PeerConnection;
-import org.webrtc.PeerConnectionFactory;
-import org.webrtc.SessionDescription;
-import org.webrtc.SdpObserver;
-import org.webrtc.DataChannel;
 import java.util.ArrayList;
 import java.util.List;
-import io.socket.client.Socket;
 import org.json.JSONException;
 import org.json.JSONObject;
 import android.os.Handler;
@@ -29,6 +19,17 @@ import android.content.IntentFilter;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.nfc.tech.NfcA;
+import android.view.View;
+
+import org.webrtc.AudioSource;
+import org.webrtc.AudioTrack;
+import org.webrtc.MediaConstraints;
+import org.webrtc.MediaStream;
+import org.webrtc.PeerConnection;
+import org.webrtc.PeerConnectionFactory;
+import org.webrtc.SessionDescription;
+import org.webrtc.SdpObserver;
+import org.webrtc.DataChannel;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -41,9 +42,9 @@ public class MainActivity extends AppCompatActivity {
     private PeerConnectionFactory peerConnectionFactory; //фабрика для создания объектов WebRTC
     private PeerConnection peerConnection; //соединение между двумя участниками
     private AudioTrack remoteAudioTrack; //аудиотрек, получаемый от удаленного участника
-    private Socket mSocket; //клиент Socket.IO для связи с сервером
     private TextView connectionStatus; // TextView для отображения состояния подключения
     private TextView uid; // TextView для отображения UID пропуска
+    private TextView commandOverlay;
     private Handler mainHandler; //нужен для обновлений UI из других потоков
     private boolean isAudioEnabled = true; // Флаг состояния аудиовыхода
     private boolean isSocketConnected = false;
@@ -61,6 +62,8 @@ public class MainActivity extends AppCompatActivity {
 
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        commandOverlay = findViewById(R.id.commandOverlay);
+        commandOverlay.setVisibility(View.VISIBLE);
 
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
 
@@ -177,9 +180,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         client = new OkHttpClient();
-        Request request = new Request.Builder()
-                .url("ws://192.168.0.118:8080") // Поменяй на свой адрес
-                .build();
+        Request request = new Request.Builder().url("ws://192.168.0.118:8080").build();
 
         webSocket = client.newWebSocket(request, new WebSocketListener() {
             @Override
@@ -195,6 +196,11 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onMessage(WebSocket webSocket, String text) {
                 Log.d("WebSocket", "Получено: " + text);
+
+                runOnUiThread(() -> {
+                    showCommandOverlay("Команда: " + text);
+                });
+
                 if ((NumberDevice != null) && (InNumberDevice == false)) {
                     AudioMute(text);
 
@@ -293,12 +299,6 @@ public class MainActivity extends AppCompatActivity {
             remoteAudioTrack = null;
         }
 
-        if (mSocket != null && mSocket.connected()) {
-            mSocket.emit("manual_disconnect"); // Сначала сообщаем серверу
-            mSocket.disconnect();              // Затем отключаемся
-            mSocket.close();                   // Закрываем
-            mSocket = null;
-        }
         isSocketConnected = false;
         Log.d(TAG, "Call stopped, peerConnection and socket closed.");
     }
@@ -367,6 +367,18 @@ public class MainActivity extends AppCompatActivity {
         } else {
             Log.e("WebSocket", "WebSocket не подключен");
         }
+    }
+
+    private void showCommandOverlay(String message) {
+        if (commandOverlay == null) return;
+
+        commandOverlay.setText(message);
+        commandOverlay.setVisibility(View.VISIBLE);
+
+        // Автоматическое скрытие через 5 секунд
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            commandOverlay.setVisibility(View.GONE);
+        }, 5000);
     }
 
     private void initializeWebRTC() {

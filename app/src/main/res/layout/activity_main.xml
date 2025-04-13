@@ -87,6 +87,21 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
+        <TextView
+            android:id="@+id/commandOverlay"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            android:layout_margin="16dp"
+            android:background="#CC000000"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:text="Ожидание команд..."
+            android:visibility="gone"
+            android:elevation="6dp"
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentEnd="true" />
+
         <EditText
             android:id="@+id/ServerNumberInput"
             android:layout_width="375dp"
