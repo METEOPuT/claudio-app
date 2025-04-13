@@ -15,26 +15,25 @@ import org.webrtc.SdpObserver;
 import org.webrtc.DataChannel;
 import java.util.ArrayList;
 import java.util.List;
-import io.socket.client.IO;
 import io.socket.client.Socket;
 import org.json.JSONException;
 import org.json.JSONObject;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.TextView;
+import android.media.AudioManager;
+import android.content.Context;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.nfc.tech.NfcA;
-import java.nio.ByteBuffer;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.WebSocket;
 import okhttp3.WebSocketListener;
-import okio.ByteString;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -53,6 +52,8 @@ public class MainActivity extends AppCompatActivity {
     private DataChannel dataChannel;
     private WebSocket webSocket;
     private OkHttpClient client;
+    private String NumberDevice;
+    private boolean InNumberDevice = false;
 
 
     @Override
@@ -89,12 +90,8 @@ public class MainActivity extends AppCompatActivity {
         //Кнопка разрыва соединения
         Button stopCallButton = findViewById(R.id.stopCallButton);
         stopCallButton.setOnClickListener(v -> {
-            if (peerConnection != null) {
-                peerConnection.close();
-                peerConnection = null;
-                Log.d(TAG, "PeerConnection closed.");
-                connectionStatus.setText("Call Stopped");
-            }
+            stopCall(); // вызываем готовую функцию
+            connectionStatus.setText("Call Stopped");
         });
     }
 
@@ -137,13 +134,12 @@ public class MainActivity extends AppCompatActivity {
             if (tag != null) {
                 NfcA nfcA = NfcA.get(tag);
                 try {
+                    nfcA.connect();
                     if (nfcA != null && nfcA.isConnected()) {
                         Log.d("NFC", "Successfully connected to tag");
                     } else {
                         Log.e("NFC", "Failed to connect to tag");
                     }
-
-                    nfcA.connect();
                     byte[] id = nfcA.getTag().getId(); // Получаем уникальный ID карты
                     String cardNumber = bytesToHex(id); // Преобразуем байты в строку
 
@@ -173,7 +169,7 @@ public class MainActivity extends AppCompatActivity {
         return stringBuilder.toString();
     }
 
-    //Подключение к серверу через Socket.IO
+    //Подключение к серверу через WebSocket
     private void connectToServer() {
         if (webSocket != null) {
             Log.d("WebSocket", "Уже подключено");
@@ -199,19 +195,25 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onMessage(WebSocket webSocket, String text) {
                 Log.d("WebSocket", "Получено: " + text);
-                try {
-                    JSONObject message = new JSONObject(text);
-                    String type = message.getString("type");
-                    String data = message.getString("data");
-                    handleIncomingSignal(type, data);
-                } catch (JSONException e) {
-                    Log.e("WebSocket", "Ошибка разбора JSON", e);
+                if ((NumberDevice != null) && (InNumberDevice == false)) {
+                    AudioMute(text);
+
+                }
+                if ((NumberDevice == null) && (InNumberDevice = true)) {
+                    NumberDevice = text;
+                    InNumberDevice = false;
+                    Log.d("WebSocket", "Присвоен номер устройства: "+NumberDevice);
                 }
             }
 
             @Override
-            public void onFailure(WebSocket webSocket, Throwable t, okhttp3.Response response) {
+            public void onFailure(WebSocket socket, Throwable t, okhttp3.Response response) {
                 Log.e("WebSocket", "Ошибка соединения", t);
+                if (response != null) {
+                    Log.e("WebSocket", "Ответ сервера: " + response.code() + " " + response.message());
+                }
+                isSocketConnected = false;
+                webSocket = null;
                 runOnUiThread(() -> connectionStatus.setText("Connection Error"));
             }
 
@@ -227,6 +229,53 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
+
+    //Регулировщик аудиовыхода
+    private void AudioMute(String text) {
+        if (NumberDevice != null && text.equals("0")) { //Если включил или обратился ко всем
+            isAudioEnabled = true;
+            runOnUiThread(() -> {
+                enableAudioOutput(true, true);
+            });
+        }
+        if (NumberDevice != null && text.equals(NumberDevice)) { //Если обратились ко мне
+            isAudioEnabled = true;
+            runOnUiThread(() -> {
+                enableAudioOutput(false, true);
+            });
+        }
+        if (NumberDevice != null && !text.equals(NumberDevice) && !text.equals("-1") && !text.equals("0")) { //Если обратились к другому
+            isAudioEnabled = false;
+            runOnUiThread(() -> {
+                enableAudioOutput(true, false);
+            });
+        }
+        if (NumberDevice != null && text.equals("-1")) { //Если замутили всех
+            isAudioEnabled = false;
+            runOnUiThread(() -> {
+                enableAudioOutput(false, false);
+            });
+        }
+    }
+
+    private void enableAudioOutput(boolean enable, boolean enable1) {
+        Button audioOutputButton = findViewById(R.id.AudioOutputButton);
+        runOnUiThread(() -> {
+            // Всё, что меняет UI — кнопки, тексты, анимации и т.д.
+            audioOutputButton.setEnabled(enable);
+
+            // Обновляем визуальное состояние кнопки
+            if (!enable1) {
+                audioOutputButton.setBackgroundResource(R.drawable.rounded_button_red);  // Блокируем
+            } else {
+                audioOutputButton.setBackgroundResource(R.drawable.rounded_button_green);  // Разблокируем
+            }
+
+            Log.d("WebRTC_Audio", "Audio output: " + (enable ? "Enabled" : "Disabled"));
+            Log.d("WebRTC_Audio", "Audio output: " + (enable1 ? "ON" : "OFF"));
+        });
+    }
+
     //Завершает соединение с сервером и отключает аудиовыход
     private void stopCall() {
         if (webSocket != null) {
@@ -259,60 +308,22 @@ public class MainActivity extends AppCompatActivity {
 
         isAudioEnabled = !isAudioEnabled;
 
-        // Если уже есть треки — применяем к ним
-        if (remoteAudioTrack != null) {
-            remoteAudioTrack.setEnabled(isAudioEnabled);
-        }
-        if (localAudioTrack != null) {
-            localAudioTrack.setEnabled(isAudioEnabled);
+        AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+
+        if (isAudioEnabled) {
+            // Включаем вывод в наушники или динамики (например, в наушники)
+            audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+            audioManager.setSpeakerphoneOn(false);  // Используем наушники
+        } else {
+            // Отключаем вывод звука
+            audioManager.setMode(AudioManager.MODE_NORMAL);  // Отправляем звук в телефон, но не воспроизводим
+            audioManager.setSpeakerphoneOn(false);  // Отключаем динамики
         }
 
         int backgroundRes = isAudioEnabled ? R.drawable.rounded_button_green : R.drawable.rounded_button_red;
         audioOutputButton.setBackgroundResource(backgroundRes);
 
         Log.d("WebRTC_Audio", "Audio output: " + (isAudioEnabled ? "ON" : "OFF"));
-    }
-
-    private void handleIncomingSignal(String type, String data) {
-        if (type.equals("offer")) {
-            SessionDescription offer = new SessionDescription(SessionDescription.Type.OFFER, data);
-            peerConnection.setRemoteDescription(new SdpObserver() {
-                @Override
-                public void onSetSuccess() {
-                    Log.d(TAG, "Remote SDP set successfully");
-                    // Создаем ответ (answer) после установки удаленного описания
-                    peerConnection.createAnswer(new SdpObserver() {
-                        @Override
-                        public void onCreateSuccess(SessionDescription sessionDescription) {
-                            peerConnection.setLocalDescription(this, sessionDescription);
-                            sendSignalToServer("answer", sessionDescription.description);
-                        }
-
-                        @Override
-                        public void onSetSuccess() {}
-
-                        @Override
-                        public void onCreateFailure(String s) {
-                            Log.e(TAG, "Failed to create answer: " + s);
-                        }
-
-                        @Override
-                        public void onSetFailure(String s) {}
-                    }, new MediaConstraints());
-                }
-
-                @Override
-                public void onSetFailure(String s) {
-                    Log.e(TAG, "Failed to set remote SDP: " + s);
-                }
-
-                @Override
-                public void onCreateFailure(String s) {}
-
-                @Override
-                public void onCreateSuccess(SessionDescription sessionDescription) {}
-            }, offer);
-        }
     }
 
     //Обновление текстового поля о состоянии соединения
@@ -327,6 +338,7 @@ public class MainActivity extends AppCompatActivity {
             if (uid != null) {
                 uid.setText("UID: " + cardNumber);
                 Log.d("NFC", "UID updated on UI");
+
             } else {
                 Log.e("NFC", "UID TextView is null");
             }
@@ -348,14 +360,10 @@ public class MainActivity extends AppCompatActivity {
 
     private void sendCardNumberThroughWebSocket(String cardNumber) {
         if (webSocket != null) {
-            try {
-                JSONObject message = new JSONObject();
-                message.put("uid", cardNumber);
-                webSocket.send(message.toString());
-                Log.d("WebSocket", "UID отправлен: " + cardNumber);
-            } catch (JSONException e) {
-                Log.e("WebSocket", "Ошибка отправки UID", e);
-            }
+            String message = cardNumber;
+            webSocket.send("UID:"+message);
+            InNumberDevice = true;
+            Log.d("WebSocket", "UID отправлен: " + cardNumber);
         } else {
             Log.e("WebSocket", "WebSocket не подключен");
         }
@@ -436,29 +444,6 @@ public class MainActivity extends AppCompatActivity {
                 MainActivity.this.dataChannel = dataChannel;
             }
         });
-
-        // Шаг 4: Сигнализация (Установка SDP)
-        peerConnection.createOffer(new SdpObserver() {
-            @Override
-            public void onCreateSuccess(SessionDescription sessionDescription) {
-                peerConnection.setLocalDescription(this, sessionDescription);
-                sendSignalToServer("offer", sessionDescription.description);
-                Log.d(TAG, "Local SDP set: " + sessionDescription.description);
-            }
-
-            @Override
-            public void onSetSuccess() {
-            }
-
-            @Override
-            public void onCreateFailure(String s) {
-                Log.e(TAG, "Failed to create SDP: " + s);
-            }
-
-            @Override
-            public void onSetFailure(String s) {
-            }
-        }, new MediaConstraints());
     }
 }
 
