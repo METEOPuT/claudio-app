@@ -85,7 +85,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void startWebRTC() {
         // Настройка WebRTC
-        webRTCClient.createPeerConnection();
+        webRTCClient.startConnectionViaHttp("192.168.0.36:8889");
         connectionStatus.setText("WebRTC Connected");
         isWebRTCConnected = true;
         Log.d(TAG, "WebRTC соединение установлено.");
@@ -173,7 +173,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         client = new OkHttpClient();
-        Request request = new Request.Builder().url("ws://192.168.0.118:8080").build();
+        Request request = new Request.Builder().url("ws://192.168.0.36:80").build();
 
         webSocket = client.newWebSocket(request, new WebSocketListener() {
             @Override

@@ -42,7 +42,7 @@ public class WebRTCClient {
     }
 
     public void startConnectionViaHttp(String serverUrl) {
-        createPeerConnection("192.168.1.100:8889");
+        createPeerConnection(serverUrl);
 
         peerConnection.createOffer(new SdpObserverImpl() {
             @Override
