@@ -30,6 +30,12 @@ import android.nfc.Tag;
 import android.nfc.tech.NfcA;
 import java.nio.ByteBuffer;
 
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.WebSocket;
+import okhttp3.WebSocketListener;
+import okio.ByteString;
+
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "WebRTC_Audio";
@@ -41,9 +47,12 @@ public class MainActivity extends AppCompatActivity {
     private TextView uid; // TextView для отображения UID пропуска
     private Handler mainHandler; //нужен для обновлений UI из других потоков
     private boolean isAudioEnabled = true; // Флаг состояния аудиовыхода
+    private boolean isSocketConnected = false;
     private NfcAdapter nfcAdapter;
     private AudioTrack localAudioTrack;
     private DataChannel dataChannel;
+    private WebSocket webSocket;
+    private OkHttpClient client;
 
 
     @Override
@@ -142,7 +151,7 @@ public class MainActivity extends AppCompatActivity {
                     updateUID(cardNumber);
 
                     // Отправка номера карты через WebRTC
-                    sendCardNumberThroughWebRTC(cardNumber);
+                    sendCardNumberThroughWebSocket(cardNumber);
 
                     nfcA.close();
                 } catch (Exception e) {
@@ -164,69 +173,67 @@ public class MainActivity extends AppCompatActivity {
         return stringBuilder.toString();
     }
 
-    private void sendCardNumberThroughWebRTC(String cardNumber) {
-        if (dataChannel != null) {
-            // Преобразуем строку в массив байт
-            byte[] cardNumberBytes = cardNumber.getBytes();
-
-            // Создаем ByteBuffer из массива байт
-            ByteBuffer byteBuffer = ByteBuffer.wrap(cardNumberBytes);
-
-            // Создаем DataChannel.Buffer с ByteBuffer
-            DataChannel.Buffer buffer = new DataChannel.Buffer(byteBuffer, false);
-
-            // Отправляем данные через DataChannel
-            dataChannel.send(buffer);
-            Log.d("WebRTC", "Card number sent: " + cardNumber);
-        }
-    }
-
     //Подключение к серверу через Socket.IO
     private void connectToServer() {
-        try {
-            mSocket = IO.socket("http://192.168.0.118:8080");
-            mSocket.connect();
-
-            mSocket.on(Socket.EVENT_CONNECT, args -> {
-                runOnUiThread(() -> {
-                    connectionStatus.setText("Connected");
-                    Log.d("Socket.IO", "Connected to server!");
-                    initializeWebRTC(); // Запускаем WebRTC только после соединения
-                });
-            });
-
-            mSocket.on(Socket.EVENT_DISCONNECT, args -> {
-                runOnUiThread(() -> {
-                    connectionStatus.setText("Disconnected");
-                    Log.d("Socket.IO", "Disconnected from server");
-                });
-            });
-
-            mSocket.on(Socket.EVENT_CONNECT_ERROR, args -> {
-                runOnUiThread(() -> {
-                    connectionStatus.setText("Connection Error");
-                    Log.e("Socket.IO", "Connection error", (Throwable) args[0]);
-                });
-            });
-
-            mSocket.on("signal", args -> {
-                JSONObject data = (JSONObject) args[0];
-                try {
-                    String type = data.getString("type");
-                    String message = data.getString("data");
-                    handleIncomingSignal(type, message);
-                } catch (JSONException e) {
-                    Log.e(TAG, "Signal error", e);
-                }
-            });
-
-        } catch (Exception e) {
-            Log.e("Socket.IO", "Connection error", e);
-            updateConnectionStatus("Error: " + e.getMessage());
+        if (webSocket != null) {
+            Log.d("WebSocket", "Уже подключено");
+            return;
         }
+
+        client = new OkHttpClient();
+        Request request = new Request.Builder()
+                .url("ws://192.168.0.118:8080") // Поменяй на свой адрес
+                .build();
+
+        webSocket = client.newWebSocket(request, new WebSocketListener() {
+            @Override
+            public void onOpen(WebSocket webSocket, okhttp3.Response response) {
+                runOnUiThread(() -> {
+                    isSocketConnected = true;
+                    connectionStatus.setText("Connected (WebSocket)");
+                    Log.d("WebSocket", "Соединение открыто");
+                    initializeWebRTC();
+                });
+            }
+
+            @Override
+            public void onMessage(WebSocket webSocket, String text) {
+                Log.d("WebSocket", "Получено: " + text);
+                try {
+                    JSONObject message = new JSONObject(text);
+                    String type = message.getString("type");
+                    String data = message.getString("data");
+                    handleIncomingSignal(type, data);
+                } catch (JSONException e) {
+                    Log.e("WebSocket", "Ошибка разбора JSON", e);
+                }
+            }
+
+            @Override
+            public void onFailure(WebSocket webSocket, Throwable t, okhttp3.Response response) {
+                Log.e("WebSocket", "Ошибка соединения", t);
+                runOnUiThread(() -> connectionStatus.setText("Connection Error"));
+            }
+
+            @Override
+            public void onClosing(WebSocket webSocket, int code, String reason) {
+                Log.d("WebSocket", "Соединение закрывается: " + reason);
+            }
+
+            @Override
+            public void onClosed(WebSocket webSocket, int code, String reason) {
+                Log.d("WebSocket", "Соединение закрыто: " + reason);
+                runOnUiThread(() -> connectionStatus.setText("Disconnected"));
+            }
+        });
     }
     //Завершает соединение с сервером и отключает аудиовыход
     private void stopCall() {
+        if (webSocket != null) {
+            webSocket.close(1000, "Manual disconnect");
+            webSocket = null;
+        }
+
         if (peerConnection != null) {
             peerConnection.close();
             peerConnection = null;
@@ -243,7 +250,7 @@ public class MainActivity extends AppCompatActivity {
             mSocket.close();                   // Закрываем
             mSocket = null;
         }
-
+        isSocketConnected = false;
         Log.d(TAG, "Call stopped, peerConnection and socket closed.");
     }
     //Меняет состояние включения аудиотрека
@@ -327,13 +334,30 @@ public class MainActivity extends AppCompatActivity {
     }
     //Отправка сигнального сообщения на сервер через Socket.IO
     private void sendSignalToServer(String type, String data) {
-        try {
-            JSONObject message = new JSONObject();
-            message.put("type", type);
-            message.put("data", data);
-            mSocket.emit("signal", message);
-        } catch (JSONException e) {
-            Log.e(TAG, "Error sending signal to server", e);
+        if (webSocket != null) {
+            try {
+                JSONObject message = new JSONObject();
+                message.put("type", type);
+                message.put("data", data);
+                webSocket.send(message.toString());
+            } catch (JSONException e) {
+                Log.e(TAG, "Ошибка при отправке сигнала", e);
+            }
+        }
+    }
+
+    private void sendCardNumberThroughWebSocket(String cardNumber) {
+        if (webSocket != null) {
+            try {
+                JSONObject message = new JSONObject();
+                message.put("uid", cardNumber);
+                webSocket.send(message.toString());
+                Log.d("WebSocket", "UID отправлен: " + cardNumber);
+            } catch (JSONException e) {
+                Log.e("WebSocket", "Ошибка отправки UID", e);
+            }
+        } else {
+            Log.e("WebSocket", "WebSocket не подключен");
         }
     }
 
