@@ -61,6 +61,7 @@ public class MainActivity extends AppCompatActivity {
         ArrayList<String> items = new ArrayList<>();
         items.add("10.42.0.1");
         items.add("192.168.0.118");
+        items.add("192.168.0.36");
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, items);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -410,7 +411,7 @@ public class MainActivity extends AppCompatActivity {
         Log.d("NFC", "Updating FIO: " + FIO);
         mainHandler.post(() -> {
             if (fio != null) {
-                fio.setText("UID: " + FIO);
+                fio.setText("ФИО: " + FIO);
                 Log.d("NFC", "FIO updated on UI");
 
             } else {
