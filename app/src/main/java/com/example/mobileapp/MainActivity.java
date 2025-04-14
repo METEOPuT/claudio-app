@@ -92,7 +92,7 @@ public class MainActivity extends AppCompatActivity {
     private void startWebRTC() {
         try {
             // Настройка WebRTC
-            webRTCClient.startConnectionViaHttp("http://192.168.0.36:8889/stream");
+            webRTCClient.startConnectionViaHttp("http://192.168.0.118:8889/stream");
             connectionStatus.setText("WebRTC Connected");
             isWebRTCConnected = true;
             Log.d(TAG, "WebRTC соединение установлено.");
@@ -142,6 +142,9 @@ public class MainActivity extends AppCompatActivity {
                 NfcA nfcA = NfcA.get(tag);
                 try {
                     nfcA.connect();
+                    AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+                    audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+                    audioManager.setSpeakerphoneOn(false);
                     if (nfcA != null && nfcA.isConnected()) {
                         Log.d("NFC", "Successfully connected to tag");
                     } else {
@@ -155,8 +158,8 @@ public class MainActivity extends AppCompatActivity {
 
                     // Отправка номера карты через WebRTC
                     sendCardNumberThroughWebSocket(cardNumber);
-
                     nfcA.close();
+
                 } catch (Exception e) {
                     Log.e("NFC", "Ошибка чтения NFC", e);
                 }
@@ -184,7 +187,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         client = new OkHttpClient();
-        Request request = new Request.Builder().url("ws://192.168.0.36:80").build();
+        Request request = new Request.Builder().url("ws://192.168.0.118:8080").build();
 
         webSocket = client.newWebSocket(request, new WebSocketListener() {
             @Override
@@ -200,11 +203,11 @@ public class MainActivity extends AppCompatActivity {
             public void onMessage(WebSocket webSocket, String text) {
                 Log.d("WebSocket", "Получено: " + text);
 
-                if ((NumberDevice != null) && (InNumberDevice == false)) {
+                if (InNumberDevice == false) {
                     AudioMute(text);
 
                 }
-                if ((NumberDevice == null) && (InNumberDevice = true)) {
+                if (InNumberDevice == true) {
                     NumberDevice = text;
                     InNumberDevice = false;
                     Log.d("WebSocket", "Присвоен номер устройства: "+NumberDevice);
@@ -320,11 +323,13 @@ public class MainActivity extends AppCompatActivity {
         if (isAudioEnabled) {
             // Включаем вывод в наушники или динамики (например, в наушники)
             audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
-            audioManager.setSpeakerphoneOn(false);  // Используем наушники, если они подключены
+            audioManager.setSpeakerphoneOn(false);
+            audioManager.startBluetoothSco();
+            audioManager.setBluetoothScoOn(true);
         } else {
             // Отключаем вывод звука
-            audioManager.setMode(AudioManager.MODE_NORMAL);  // Звук в телефон, не воспроизводим
-            audioManager.setSpeakerphoneOn(false);  // Отключаем динамики
+            audioManager.setMode(AudioManager.MODE_NORMAL);
+            audioManager.setSpeakerphoneOn(false);
         }
 
         if (webRTCClient != null) {

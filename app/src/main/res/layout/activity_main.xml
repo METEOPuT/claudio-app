@@ -41,7 +41,7 @@
                 android:id="@+id/AudioOutputButton"
                 android:layout_width="125dp"
                 android:layout_height="125dp"
-                android:text="Аудиовыход ON/OFF"
+                android:text="Аудиовыход\nON/OFF"
                 android:textSize="11sp"
                 android:background="@drawable/rounded_button_selector"/>
 
