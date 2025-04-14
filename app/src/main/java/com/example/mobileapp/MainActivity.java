@@ -99,9 +99,6 @@ public class MainActivity extends AppCompatActivity {
         Button startCallButton = findViewById(R.id.startCallButton);
         startCallButton.setOnClickListener(v -> {
             connectToServer();      // Сначала подключаемся к WebSocket
-            if (!isWebRTCConnected) {
-                startWebRTC(); // Подключаем WebRTC
-            }
         });
 
         //Кнопка аудиовыхода
@@ -188,9 +185,13 @@ public class MainActivity extends AppCompatActivity {
                     Log.d("NFC", "Card ID: " + cardNumber);
                     updateUID(cardNumber);
 
-                    // Отправка номера карты через WebRTC
+                    // Отправка номера карты через WebSocket
                     sendCardNumberThroughWebSocket(cardNumber);
                     nfcA.close();
+
+                    if (!isWebRTCConnected) {
+                        startWebRTC(); // Подключаем WebRTC
+                    }
 
                 } catch (Exception e) {
                     Log.e("NFC", "Ошибка чтения NFC", e);
