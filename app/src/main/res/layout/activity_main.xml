@@ -53,7 +53,44 @@
             android:layout_height="wrap_content"
             android:text="Status: Disconnected"
             android:textSize="20sp"
-            android:layout_marginTop="-200dp"
+            android:layout_marginTop="-150dp"
+            android:layout_gravity="center"
+
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/fio"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ФИО:"
+            android:textSize="20sp"
+            android:layout_gravity="center"
+
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="=============================="
+            android:textSize="20sp"
+            android:layout_gravity="center"
+
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Поле разработчика\n"
+            android:textSize="20sp"
             android:layout_gravity="center"
 
             app:layout_constraintBottom_toBottomOf="parent"
@@ -75,10 +112,9 @@
             app:layout_constraintTop_toTopOf="parent" />
 
         <TextView
-            android:id="@+id/fio"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="ФИО:"
+            android:text="IP-адрес сервера:"
             android:textSize="20sp"
             android:layout_gravity="center"
 
@@ -87,33 +123,11 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        /*<TextView
-            android:id="@+id/commandOverlay"
+        <Spinner
+            android:id="@+id/spinner"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:padding="8dp"
-            android:layout_margin="16dp"
-            android:background="#CC000000"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:text="Ожидание команд..."
-            android:visibility="gone"
-            android:elevation="6dp"
-            android:layout_alignParentBottom="true"
-            android:layout_alignParentEnd="true" />*/
-
-        <EditText
-            android:id="@+id/ServerNumberInput"
-            android:layout_width="375dp"
-            android:layout_height="50dp"
-            android:background="@color/white"
-            android:backgroundTint="@android:color/transparent"
-            android:elevation="4dp"
-            android:gravity="center"
-            android:hint="Номер канала связи с сервером"
-            android:inputType="number"
-            android:outlineSpotShadowColor="@color/black"
-            android:textSize="18sp" />
+            android:padding="11dp"/>
 
     </LinearLayout>
 

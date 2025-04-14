@@ -15,7 +15,12 @@ import android.content.IntentFilter;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.nfc.tech.NfcA;
-import android.media.AudioTrack;
+import android.widget.ArrayAdapter;
+import android.widget.Spinner;
+import android.view.View;
+import android.widget.AdapterView;
+
+import java.util.ArrayList;
 
 import org.webrtc.MediaStream;
 
@@ -28,6 +33,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "WebRTC_Audio";
     private TextView connectionStatus; // TextView для отображения состояния подключения
     private TextView uid; // TextView для отображения UID пропуска
+    private TextView fio;
     private Handler mainHandler; //нужен для обновлений UI из других потоков
     private boolean isAudioEnabled = true; // Флаг состояния аудиовыхода
     private boolean isSocketConnected = false;
@@ -37,9 +43,12 @@ public class MainActivity extends AppCompatActivity {
     private WebRTCClient webRTCClient;
     private OkHttpClient client;
     private String NumberDevice;
+    private String FIO;
+    private String IP;
     private boolean InNumberDevice = false;
-    private AudioTrack audioTrack;
     private MediaStream audioStream;
+
+
 
 
     @Override
@@ -47,6 +56,27 @@ public class MainActivity extends AppCompatActivity {
 
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        Spinner spinner = findViewById(R.id.spinner);
+        ArrayList<String> items = new ArrayList<>();
+        items.add("10.42.0.1");
+        items.add("192.168.0.118");
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, items);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+
+        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parentView, View selectedItemView, int position, long id) {
+                String selectedIp = parentView.getItemAtPosition(position).toString();
+                // Сохраняем выбранный IP
+                IP = selectedIp;
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parentView) {
+            }
+        });
 
         webRTCClient = new WebRTCClient(this);; // Инициализация WebRTC клиента
         audioStream = webRTCClient.getMediaStream();
@@ -79,6 +109,7 @@ public class MainActivity extends AppCompatActivity {
 
         connectionStatus = findViewById(R.id.connectionStatus);
         uid = findViewById(R.id.uid);
+        fio = findViewById(R.id.fio);
         mainHandler = new Handler(Looper.getMainLooper());
 
         //Кнопка разрыва соединения
@@ -92,7 +123,7 @@ public class MainActivity extends AppCompatActivity {
     private void startWebRTC() {
         try {
             // Настройка WebRTC
-            webRTCClient.startConnectionViaHttp("http://192.168.0.118:8889/stream");
+            webRTCClient.startConnectionViaHttp("http://"+IP+":8889/stream");
             connectionStatus.setText("WebRTC Connected");
             isWebRTCConnected = true;
             Log.d(TAG, "WebRTC соединение установлено.");
@@ -187,7 +218,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         client = new OkHttpClient();
-        Request request = new Request.Builder().url("ws://192.168.0.118:8080").build();
+        Request request = new Request.Builder().url("ws://"+IP+":8080").build();
 
         webSocket = client.newWebSocket(request, new WebSocketListener() {
             @Override
@@ -207,10 +238,15 @@ public class MainActivity extends AppCompatActivity {
                     AudioMute(text);
 
                 }
-                if (InNumberDevice == true) {
+                if (InNumberDevice == true && !text.startsWith("FIO:")) {
                     NumberDevice = text;
-                    InNumberDevice = false;
                     Log.d("WebSocket", "Присвоен номер устройства: "+NumberDevice);
+                }
+                if (InNumberDevice == true && text.startsWith("FIO:")) {
+                    FIO = text.substring(4);
+                    InNumberDevice = false;
+                    updateFIO(FIO);
+                    Log.d("WebSocket", "Присвоены ФИО клиента: "+ FIO);
                 }
             }
 
@@ -370,6 +406,19 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void updateFIO(String FIO) {
+        Log.d("NFC", "Updating FIO: " + FIO);
+        mainHandler.post(() -> {
+            if (fio != null) {
+                fio.setText("UID: " + FIO);
+                Log.d("NFC", "FIO updated on UI");
+
+            } else {
+                Log.e("NFC", "FIO TextView is null");
+            }
+        });
+    }
+
     private void sendCardNumberThroughWebSocket(String cardNumber) {
         if (webSocket != null) {
             String message = cardNumber;
@@ -381,4 +430,5 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 }
+
 
