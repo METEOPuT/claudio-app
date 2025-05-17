@@ -4,5 +4,5 @@
 
     <solid android:color="@android:color/holo_green_light"/> <!-- Цвет кнопки -->
 
-    <corners android:radius="62dp"/> <!-- Скругление углов -->
+    <corners android:radius="90dp"/> <!-- Скругление углов -->
 </shape>
