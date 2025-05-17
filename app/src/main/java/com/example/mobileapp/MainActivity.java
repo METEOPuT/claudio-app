@@ -261,6 +261,14 @@ public class MainActivity extends AppCompatActivity {
                 isSocketConnected = false;
                 webSocket = null;
                 runOnUiThread(() -> connectionStatus.setText("Connection Error"));
+                new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        if ("Connection Error".equals(connectionStatus.getText().toString())) {
+                            connectionStatus.setText("Disconnected");
+                        }
+                    }
+                }, 5000);
             }
 
             @Override
@@ -350,6 +358,15 @@ public class MainActivity extends AppCompatActivity {
         isWebRTCConnected = false;
         isSocketConnected = false;
         Log.d(TAG, "Call stopped, peerConnection and socket closed.");
+
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if ("Call Stopped".equals(connectionStatus.getText().toString())) {
+                    connectionStatus.setText("Disconnected");
+                }
+            }
+        }, 5000);
     }
     //Меняет состояние включения аудиотрека
     private void toggleAudioOutput() {
