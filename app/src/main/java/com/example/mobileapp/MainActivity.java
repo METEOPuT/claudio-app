@@ -114,7 +114,6 @@ public class MainActivity extends AppCompatActivity {
         Button stopCallButton = findViewById(R.id.stopCallButton);
         stopCallButton.setOnClickListener(v -> {
             stopCall(); // вызываем готовую функцию
-            connectionStatus.setText("Call Stopped");
         });
     }
 
@@ -189,10 +188,6 @@ public class MainActivity extends AppCompatActivity {
                     sendCardNumberThroughWebSocket(cardNumber);
                     nfcA.close();
 
-                    if (!isWebRTCConnected) {
-                        startWebRTC(); // Подключаем WebRTC
-                    }
-
                 } catch (Exception e) {
                     Log.e("NFC", "Ошибка чтения NFC", e);
                 }
@@ -242,6 +237,9 @@ public class MainActivity extends AppCompatActivity {
                 }
                 if (InNumberDevice == true && !text.startsWith("FIO:")) {
                     NumberDevice = text;
+                    if ("-1".equals(NumberDevice)) {
+                        stopCall();
+                    }
                     Log.d("WebSocket", "Присвоен номер устройства: "+NumberDevice);
                 }
                 if (InNumberDevice == true && text.startsWith("FIO:")) {
@@ -249,6 +247,9 @@ public class MainActivity extends AppCompatActivity {
                     InNumberDevice = false;
                     updateFIO(FIO);
                     Log.d("WebSocket", "Присвоены ФИО клиента: "+ FIO);
+                    if ((!isWebRTCConnected) && (!"-1".equals(NumberDevice))) {
+                        startWebRTC(); // Подключаем WebRTC
+                    }
                 }
             }
 
@@ -365,8 +366,15 @@ public class MainActivity extends AppCompatActivity {
                 if ("Call Stopped".equals(connectionStatus.getText().toString())) {
                     connectionStatus.setText("Disconnected");
                 }
+                mainHandler.post(() -> {
+                    if (uid != null) uid.setText("UID:");
+                    if (fio != null) fio.setText("ФИО:");
+                });
             }
         }, 5000);
+
+        NumberDevice = null;
+        FIO = null;
     }
     //Меняет состояние включения аудиотрека
     private void toggleAudioOutput() {
@@ -429,7 +437,12 @@ public class MainActivity extends AppCompatActivity {
         Log.d("NFC", "Updating FIO: " + FIO);
         mainHandler.post(() -> {
             if (fio != null) {
-                fio.setText("ФИО: " + FIO);
+                if ("BAN".equals(FIO)) {
+                    fio.setText("В доступе к микрофону отказано");
+                }
+                else {
+                    fio.setText("ФИО: " + FIO);
+                }
                 Log.d("NFC", "FIO updated on UI");
 
             } else {
